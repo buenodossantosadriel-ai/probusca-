@@ -25,98 +25,12 @@
 
         <!-- Abas de Seleção -->
         <div class="flex flex-wrap justify-center gap-2 mb-6">
-            <button onclick="mudarTipo('cnpj')" id="btn-cnpj" class="px-4 py-2 rounded-lg font-medium text-sm transition bg-blue-600 text-white shadow-lg shadow-blue-600/30">Consultar CNPJ</button>
-            <button onclick="mudarTipo('estado')" id="btn-estado" class="px-4 py-2 rounded-lg font-medium text-sm transition bg-slate-800 text-slate-300 hover:bg-slate-700">Buscar por Estado (UF)</button>
-            <button onclick="mudarTipo('cpf')" id="btn-cpf" class="px-4 py-2 rounded-lg font-medium text-sm transition bg-slate-800 text-slate-300 hover:bg-slate-700">Validar CPF</button>
+            <button type="button" onclick="mudarTipo('cnpj')" id="btn-cnpj" class="px-4 py-2 rounded-lg font-medium text-sm transition bg-blue-600 text-white shadow-lg shadow-blue-600/30">Consultar CNPJ</button>
+            <button type="button" onclick="mudarTipo('estado')" id="btn-estado" class="px-4 py-2 rounded-lg font-medium text-sm transition bg-slate-800 text-slate-300 hover:bg-slate-700">Buscar por Estado (UF)</button>
+            <button type="button" onclick="mudarTipo('cpf')" id="btn-cpf" class="px-4 py-2 rounded-lg font-medium text-sm transition bg-slate-800 text-slate-300 hover:bg-slate-700">Validar CPF</button>
         </div>
 
         <!-- Caixa de Pesquisa Dinâmica -->
         <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
             <div id="container-inputs" class="flex flex-col sm:flex-row gap-3">
-                <input type="text" id="input-termo" placeholder="Digite o CNPJ (ex: 33000167000101)" class="flex-grow bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-blue-500 transition">
-                <button onclick="realizarBusca()" id="btn-buscar" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 py-3 rounded-xl transition shadow-lg shadow-blue-600/20 flex items-center justify-center">
-                    Pesquisar
-                </button>
-            </div>
-        </div>
-
-        <!-- Área de Carregamento -->
-        <div id="loading" class="hidden text-center py-10">
-            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
-            <p class="text-slate-400 text-sm mt-3">Consultando bases de dados oficiais...</p>
-        </div>
-
-        <!-- Área de Resultados -->
-        <div id="resultado" class="mt-8"></div>
-    </main>
-
-    <!-- Rodapé -->
-    <footer class="bg-slate-800/50 border-t border-slate-800 text-center py-4 text-xs text-slate-500">
-        ProBusca MVP &copy; 2026 — Desenvolvido com dados públicos e oficiais.
-    </footer>
-
-    <!-- Lógica de Frontend -->
-    <script>
-        let tipoAtual = 'cnpj';
-
-        function mudarTipo(tipo) {
-            tipoAtual = tipo;
-            document.getElementById('btn-cnpj').className = tipo === 'cnpj' ? 'px-4 py-2 rounded-lg font-medium text-sm transition bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'px-4 py-2 rounded-lg font-medium text-sm transition bg-slate-800 text-slate-300 hover:bg-slate-700';
-            document.getElementById('btn-estado').className = tipo === 'estado' ? 'px-4 py-2 rounded-lg font-medium text-sm transition bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'px-4 py-2 rounded-lg font-medium text-sm transition bg-slate-800 text-slate-300 hover:bg-slate-700';
-            document.getElementById('btn-cpf').className = tipo === 'cpf' ? 'px-4 py-2 rounded-lg font-medium text-sm transition bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'px-4 py-2 rounded-lg font-medium text-sm transition bg-slate-800 text-slate-300 hover:bg-slate-700';
-
-            const container = document.getElementById('container-inputs');
-            
-            if (tipo === 'cnpj') {
-                container.innerHTML = `
-                    <input type="text" id="input-termo" placeholder="Digite o CNPJ (ex: 33000167000101)" class="flex-grow bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-blue-500 transition">
-                    <button onclick="realizarBusca()" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 py-3 rounded-xl transition shadow-lg shadow-blue-600/20">Pesquisar</button>
-                `;
-            } else if (tipo === 'estado') {
-                container.innerHTML = `
-                    <select id="input-uf" class="bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-blue-500 transition w-32">
-                        <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option><option value="AM">AM</option><option value="BA">BA</option><option value="CE">CE</option><option value="DF">DF</option><option value="ES">ES</option><option value="GO">GO</option><option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option><option value="MG" selected>MG</option><option value="PA">PA</option><option value="PB">PB</option><option value="PR">PR</option><option value="PE">PE</option><option value="PI">PI</option><option value="RJ">RJ</option><option value="RN">RN</option><option value="RS">RS</option><option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option><option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option>
-                    </select>
-                    <input type="text" id="input-termo" placeholder="Filtrar por nome/termo (opcional)" class="flex-grow bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-blue-500 transition">
-                    <button onclick="realizarBusca()" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 py-3 rounded-xl transition shadow-lg shadow-blue-600/20">Listar CNPJs</button>
-                `;
-            } else if (tipo === 'cpf') {
-                container.innerHTML = `
-                    <input type="text" id="input-termo" placeholder="Digite os 11 números do CPF" class="flex-grow bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-blue-500 transition">
-                    <button onclick="realizarBusca()" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 py-3 rounded-xl transition shadow-lg shadow-blue-600/20">Validar</button>
-                `;
-            }
-            document.getElementById('resultado').innerHTML = '';
-        }
-
-        async function realizarBusca() {
-            const resultadoDiv = document.getElementById('resultado');
-            const loadingDiv = document.getElementById('loading');
-            let url = '';
-
-            if (tipoAtual === 'cnpj') {
-                const termo = document.getElementById('input-termo').value.trim();
-                if (!termo) { alert('Digite um CNPJ'); return; }
-                url = `/api/cnpj/${termo}`; } else if (tipoAtual === 'estado') { const uf = document.getElementById('input-uf').value; const termo = document.getElementById('input-termo').value.trim(); url = `/api/estado/${uf}?termo=${encodeURIComponent(termo)}`; } else if (tipoAtual === 'cpf') { const termo = document.getElementById('input-termo').value.trim(); if (!termo) { alert('Digite um CPF'); return; } url = `/api/cpf/${termo}`;
-            }
-
-            resultadoDiv.innerHTML = '';
-            loadingDiv.classList.remove('hidden');
-
-            try {
-                const response = await fetch(url);
-                const data = await response.json();
-                loadingDiv.classList.add('hidden');
-
-                if (!response.ok) {
-                    resultadoDiv.innerHTML = `<div class="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-xl text-center">${data.error || 'Erro ao consultar.'}</div>`;
-                    return;
-                }
-
-                if (tipoAtual === 'cnpj') {
-                    resultadoDiv.innerHTML = `
-                        <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl space-y-4">
-                            <div class="flex justify-between items-start border-b border-slate-700 pb-4">
-                                <div>
-                                    <h3 class="text-xl font-bold text-white">${data.razao_social || 'N/A'}</h3>
-                                    
+                <input type="text" id="input-termo" placeholder="Digite o CNPJ (ex: 3300
