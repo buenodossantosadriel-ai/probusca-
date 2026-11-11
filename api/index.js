@@ -52,3 +52,20 @@ app.get('/api/cpf/:cpf', async (req, res) => {
 
 // Exportação obrigatória para a Vercel Serverless
 module.exports = app;
+// 4. NOVA ROTA: Listar empresas por UF e termo opcional
+app.get('/api/estado/:uf', async (req, res) => {
+  try {
+    const uf = req.params.uf.toUpperCase();
+    const termo = req.query.termo || ''; // Termo de busca opcional (ex: nome da empresa)
+    
+    // Consulta API pública de busca por estado e termo
+    const response = await axios.get(`https://publica.cnpj.ws/cnpj/busca?uf=${uf}&razao_social=${encodeURIComponent(termo)}`);
+    return res.json(response.data);
+  } catch (error) {
+    if (error.response && error.response.status === 404) {
+      return res.status(404).json({ error: 'Nenhuma empresa encontrada para este estado' });
+    }
+    return res.status(500).json({ error: 'Erro ao pesquisar empresas por estado' });
+  }
+});
+
