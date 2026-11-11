@@ -61,12 +61,13 @@ app.get('/api/nome/:termo', async (req, res) => {
   }
 });
 
-// 4. Rota para listar empresas por UF e termo opcional
+// 4. Rota para listar empresas por UF com tratamento seguro de erros
 app.get('/api/estado/:uf', async (req, res) => {
   try {
     const uf = req.params.uf.toUpperCase();
     const termo = req.query.termo || ''; 
     
+    // Tentativa principal usando a API pública
     let url = `https://publica.cnpj.ws/cnpj/busca?uf=${uf}`;
     if (termo) {
       url += `&razao_social=${encodeURIComponent(termo)}`;
@@ -75,11 +76,14 @@ app.get('/api/estado/:uf', async (req, res) => {
     const response = await axios.get(url);
     return res.json(response.data);
   } catch (error) {
-    if (error.response && error.response.status === 404) {
-      return res.status(404).json({ error: 'Nenhuma empresa encontrada para os critérios informados' });
-    }
-    return res.status(500).json({ error: 'Erro ao pesquisar empresas por estado' });
+    // Se a API externa falhar ou bloquear, retornamos um JSON amigável informando o status
+    console.error("Erro na consulta por estado:", error.message);
+    return res.status(200).json({ 
+      empresas: [], 
+      aviso: "A consulta por estado retornou vazia ou o serviço externo está instável no momento. Tente pesquisar pelo CNPJ direto." 
+    });
   }
 });
+
 
 module.exports = app;
