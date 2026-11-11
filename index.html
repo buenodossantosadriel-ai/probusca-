@@ -97,15 +97,7 @@
             if (tipoAtual === 'cnpj') {
                 const termo = document.getElementById('input-termo').value.trim();
                 if (!termo) { alert('Digite um CNPJ'); return; }
-                url = `/api/cnpj/${termo}`;
-            } else if (tipoAtual === 'estado') {
-                const uf = document.getElementById('input-uf').value;
-                const termo = document.getElementById('input-termo').value.trim();
-                url = `/api/estado/${uf}?termo=${encodeURIComponent(termo)}`;
-            } else if (tipoAtual === 'cpf') {
-                const termo = document.getElementById('input-termo').value.trim();
-                if (!termo) { alert('Digite um CPF'); return; }
-                url = `/api/cpf/${termo}`;
+                url = `/api/cnpj/${termo}`; } else if (tipoAtual === 'estado') { const uf = document.getElementById('input-uf').value; const termo = document.getElementById('input-termo').value.trim(); url = `/api/estado/${uf}?termo=${encodeURIComponent(termo)}`; } else if (tipoAtual === 'cpf') { const termo = document.getElementById('input-termo').value.trim(); if (!termo) { alert('Digite um CPF'); return; } url = `/api/cpf/${termo}`;
             }
 
             resultadoDiv.innerHTML = '';
@@ -127,54 +119,4 @@
                             <div class="flex justify-between items-start border-b border-slate-700 pb-4">
                                 <div>
                                     <h3 class="text-xl font-bold text-white">${data.razao_social || 'N/A'}</h3>
-                                    <p class="text-sm text-slate-400">${data.nome_fantasia ? 'Fantasia: ' + data.nome_fantasia : ''}</p>
-                                </div>
-                                <span class="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-xs font-semibold border border-emerald-500/30">${data.descricao_situacao_cadastral || 'Atativa'}</span>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                <div><strong class="text-slate-400">CNPJ:</strong> ${data.cnpj}</div>
-                                <div><strong class="text-slate-400">Abertura:</strong> ${data.data_inicio_atividade || 'N/A'}</div>
-                                <div><strong class="text-slate-400">Porte:</strong> ${data.porte || 'N/A'}</div>
-                                <div><strong class="text-slate-400">Telefone:</strong> ${data.ddd_telefone_1 ? '(' + data.ddd_telefone_1 + ') ' + data.telefone_1 : 'N/A'}</div>
-                                <div class="md:col-span-2"><strong class="text-slate-400">Endereço:</strong> ${data.tipo_logradouro || ''} ${data.logradouro || ''}, ${data.numero || ''} - ${data.bairro || ''}, ${data.municipio || ''}/${data.uf || ''} (${data.cep || ''})</div>
-                            </div>
-                        </div>
-                    `;
-                } else if (tipoAtual === 'estado') {
-                    let empresas = Array.isArray(data) ? data : (data.empresas || [data]);
-                    let htmlList = empresas.map(emp => `
-                        <div class="bg-slate-800/80 border border-slate-700 p-4 rounded-xl mb-3 hover:border-blue-500/50 transition flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                            <div>
-                                <h4 class="font-bold text-white">${emp.razao_social || emp.nome || 'Empresa'}</h4>
-                                <p class="text-xs text-slate-400 mt-1">CNPJ: <span class="text-blue-400 font-mono">${emp.cnpj || 'N/A'}</span></p>
-                            </div>
-                            <span class="bg-slate-700 text-slate-300 px-3 py-1 rounded-lg text-xs font-mono">${emp.uf || 'UF'}</span>
-                        </div>
-                    `).join('');
-
-                    resultadoDiv.innerHTML = `<div class="space-y-3"><h3 class="text-sm font-semibold text-slate-400 mb-2">Empresas Encontradas no Estado:</h3>${htmlList}</div>`;
-                } else if (tipoAtual === 'cpf') {
-                    resultadoDiv.innerHTML = `
-                        <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl shadow-xl space-y-4">
-                            <div class="flex justify-between items-start border-b border-slate-700 pb-4">
-                                <h3 class="text-lg font-bold text-white">Validação de CPF</h3>
-                                <span class="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-xs font-semibold border border-emerald-500/30">Válido</span>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                <div><strong class="text-slate-400">CPF:</strong> ${data.cpf}</div>
-                                <div><strong class="text-slate-400">Situação Válida:</strong> ${data.isValid ? 'Sim' : 'Não'}</div>
-                                <div><strong class="text-slate-400">Região Fiscal (RF):</strong> ${data.rf || 'N/A'}</div>
-                                <div><strong class="text-slate-400">UFs Associadas:</strong> ${data.ufs ? data.ufs.join(', ') : 'N/A'}</div>
-                            </div>
-                        </div>
-                    `;
-                }
-
-            } catch (err) {
-                loadingDiv.classList.add('hidden');
-                resultadoDiv.innerHTML = `<div class="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-xl text-center">Erro de conexão com o servidor.</div>`;
-            }
-        }
-    </script>
-</body>
-</html>
+                                    
