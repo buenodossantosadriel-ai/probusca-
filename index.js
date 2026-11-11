@@ -18,7 +18,6 @@ app.get('/api/cnpj/:cnpj', async (req, res) => {
     const cnpj = req.params.cnpj.replace(/\D/g, ''); // Limpa pontuações
     const response = await axios.get(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
     
-    // Retorna os dados limpos para o seu front-end
     return res.json(response.data);
   } catch (error) {
     if (error.response && error.response.status === 404) {
@@ -28,8 +27,13 @@ app.get('/api/cnpj/:cnpj', async (req, res) => {
   }
 });
 
-// A Vercel gerencia a porta automaticamente em produção
+// Essencial para rodar localmente e na Vercel
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`Servidor rodando na porta ${PORT}`);
+  });
+}
+
+// OBRIGATÓRIO PARA A VERCEL FUNCIONAR
+module.exports = app;
