@@ -57,7 +57,6 @@ app.get('/', (req, res) => {
             --bg-color: #0b0f19;
             --card-bg: #131b2e;
             --neon-cyan: #00f0ff;
-            --neon-purple: #9d00ff;
             --text-main: #e2e8f0;
             --text-muted: #94a3b8;
             --border-color: #1e293b;
@@ -152,11 +151,33 @@ app.get('/', (req, res) => {
             border-radius: 8px;
             white-space: pre-wrap;
             word-wrap: break-word;
-            max-height: 320px;
+            max-height: 250px;
             overflow-y: auto;
             font-size: 13px;
             margin-top: 25px;
             font-family: 'Courier New', Courier, monospace;
+        }
+
+        .download-box {
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        .btn-download {
+            display: inline-block;
+            background: #10b981;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 14px;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+            transition: 0.3s;
+        }
+
+        .btn-download:hover {
+            background: #059669;
         }
 
         .links {
@@ -198,6 +219,10 @@ app.get('/', (req, res) => {
     <button onclick="realizarConsulta()">EXECUTAR CONSULTA</button>
 
     <pre id="resultado">Aguardando comando...</pre>
+    
+    <div id="containerDownload" class="download-box" style="display:none;">
+        <a id="linkDownload" href="#" target="_blank" class="btn-download">📥 Baixar Arquivo Anexado</a>
+    </div>
 
     <div class="links">
         <a href="/login" target="_blank">Gerir Conexão</a>
@@ -209,6 +234,7 @@ app.get('/', (req, res) => {
         const tipo = document.getElementById('tipo').value;
         const termo = document.getElementById('termo').value;
         const resultadoBox = document.getElementById('resultado');
+        const containerDownload = document.getElementById('containerDownload');
 
         if (!termo) {
             alert('Por favor, preencha o termo de busca.');
@@ -216,6 +242,7 @@ app.get('/', (req, res) => {
         }
 
         resultadoBox.textContent = 'Processando consulta, aguarde...';
+        containerDownload.style.display = 'none';
 
         try {
             const resposta = await fetch('/api/consultar', {
@@ -227,7 +254,13 @@ app.get('/', (req, res) => {
             const dados = await resposta.json();
 
             if (resposta.ok) {
-                resultadoBox.textContent = dados.resultado;
+                resultadoBox.textContent = dados.resultado || 'Resposta recebida em anexo.';
+                if (dados.arquivoBase64) {
+                    const link = document.getElementById('linkDownload');
+                    link.href = \`data:\${dados.mimeType || 'application/octet-stream'};base64,\${dados.arquivoBase64}\`;
+                    link.download = dados.nomeArquivo || 'resultado.bin';
+                    containerDownload.style.display = 'block';
+                }
             } else {
                 resultadoBox.textContent = 'Erro: ' + (dados.erro || 'Falha na consulta');
             }
@@ -252,7 +285,7 @@ app.get('/login', async (req, res) => {
   if (codigo && resolveCodigo) {
     resolveCodigo(codigo);
     resolveCodigo = null;
-    return res.send(`<h2>Código recebido! A processar...</h2><p>Verifique os logs da Render em instantes para copiar a sua chave de sessão.</p>`);
+    return res.send(`<h2>Código recebido! A processar...</h2><p>Verifique os logs da Render em instantes.</p>`);
   }
 
   if (senha && resolveSenha) {
@@ -290,7 +323,7 @@ app.get('/login', async (req, res) => {
 
     return res.send(`
       <h2>Confirmação de Acesso</h2>
-      <p>Insira o código enviado para o aplicativo do número <b>${telefoneTemp}</b>.</p>
+      <p>Insira o código enviado para o número <b>${telefoneTemp}</b>.</p>
       <form action="/login" method="GET">
         <input type="text" name="codigo" placeholder="Ex: 12345" style="padding:12px; font-size:18px;" required>
         <button type="submit" style="padding:12px 20px; font-size:18px; background:#00f0ff; color:#0b0f19; border:none; font-weight:bold;">Enviar Código</button>
@@ -309,7 +342,7 @@ app.get('/login', async (req, res) => {
 });
 
 // ==========================================
-// API DE CONSULTA
+// API DE CONSULTA (COM SUPORTE A ARQUIVOS)
 // ==========================================
 app.post('/api/consultar', async (req, res) => {
   const { tipo, termo } = req.body;
@@ -323,17 +356,48 @@ app.post('/api/consultar', async (req, res) => {
   try {
     if (telegramClient && telegramClient.connected && botUsername) {
       const msgEnviada = await telegramClient.sendMessage(botUsername, { message: mensagemParaEnviar });
-      await new Promise((resolve) => setTimeout(resolve, 4500));
+      await new Promise((resolve) => setTimeout(resolve, 5000));
       const mensagens = await telegramClient.getMessages(botUsername, { limit: 3 });
       const respostaBot = mensagens.find((m) => m.id > msgEnviada.id && !m.out);
 
-      if (!respostaBot || !respostaBot.message) {
+      if (!respostaBot) {
         return res.status(504).json({ erro: 'O serviço demorou para responder.' });
       }
-      return res.json({ sucesso: true, comandoExecutado: tipo, resultado: respostaBot.message });
+
+      let respostaTexto = respostaBot.message || '';
+      let arquivoBase64 = null;
+      let nomeArquivo = null;
+      let mimeType = null;
+
+      // Se a mensagem do bot contiver um documento/arquivo anexado
+      if (respostaBot.media) {
+        try {
+          const bufferArquivo = await telegramClient.downloadMedia(respostaBot.media, {});
+          if (bufferArquivo) {
+            arquivoBase64 = bufferArquivo.toString('base64');
+            
+            // Tentar extrair o nome original do arquivo dos atributos do documento
+            const docAttr = respostaBot.media.document?.attributes?.find(attr => attr.className === 'DocumentAttributeFilename');
+            nomeArquivo = docAttr ? docAttr.fileName : 'resultado_documento.bin';
+            mimeType = respostaBot.media.document?.mimeType || 'application/octet-stream';
+          }
+        } catch (downloadErr) {
+          console.log('Erro ao baixar mídia do Telegram:', downloadErr.message);
+        }
+      }
+
+      return res.json({ 
+        sucesso: true, 
+        comandoExecutado: tipo, 
+        resultado: respostaTexto,
+        arquivoBase64,
+        nomeArquivo,
+        mimeType
+      });
     }
     return res.status(503).json({ erro: 'Serviço temporariamente indisponível.' });
   } catch (error) {
+    console.error('Erro geral na consulta:', error);
     res.status(500).json({ erro: 'Erro interno ao processar a consulta.' });
   }
 });
