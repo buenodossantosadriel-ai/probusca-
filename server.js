@@ -42,7 +42,7 @@ const MAPA_COMANDOS = {
 };
 
 // ==========================================
-// ROTA PRINCIPAL: FRONT-END NEON MODERNO
+// ROTA PRINCIPAL: FRONT-END COM A SUA FOTO
 // ==========================================
 app.get('/', (req, res) => {
   res.send(`
@@ -51,20 +51,19 @@ app.get('/', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ProBusca - Painel de Consultas</title>
+    <title>ProBusca - Painel Customizado</title>
     <style>
         :root {
-            --bg-color: #0b0f19;
-            --card-bg: #131b2e;
             --neon-cyan: #00f0ff;
             --text-main: #e2e8f0;
             --text-muted: #94a3b8;
-            --border-color: #1e293b;
         }
 
         body {
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
+            background: linear-gradient(rgba(11, 15, 25, 0.82), rgba(11, 15, 25, 0.90)), 
+                        url('https://i.ibb.co/8D7J6LY4/images-2.jpg') no-repeat center center fixed;
+            background-size: cover;
             color: var(--text-main);
             margin: 0;
             padding: 20px;
@@ -75,11 +74,13 @@ app.get('/', (req, res) => {
         }
 
         .card {
-            background-color: var(--card-bg);
-            border: 1px solid var(--border-color);
+            background-color: rgba(19, 27, 46, 0.82);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(0, 240, 255, 0.25);
             padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 0 25px rgba(0, 240, 255, 0.08);
+            border-radius: 16px;
+            box-shadow: 0 0 35px rgba(0, 240, 255, 0.2);
             width: 100%;
             max-width: 480px;
             box-sizing: border-box;
@@ -89,9 +90,9 @@ app.get('/', (req, res) => {
             margin-top: 0;
             text-align: center;
             color: var(--neon-cyan);
-            letter-spacing: 1px;
-            font-weight: 600;
-            text-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+            letter-spacing: 2px;
+            font-weight: 700;
+            text-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
         }
 
         label {
@@ -106,8 +107,8 @@ app.get('/', (req, res) => {
             width: 100%;
             padding: 14px;
             margin-top: 6px;
-            background-color: #0b0f19;
-            border: 1px solid var(--border-color);
+            background-color: rgba(11, 15, 25, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 8px;
             color: var(--text-main);
             box-sizing: border-box;
@@ -118,7 +119,7 @@ app.get('/', (req, res) => {
         select:focus, input:focus {
             outline: none;
             border-color: var(--neon-cyan);
-            box-shadow: 0 0 8px rgba(0, 240, 255, 0.25);
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
         }
 
         button {
@@ -134,18 +135,18 @@ app.get('/', (req, res) => {
             font-size: 16px;
             letter-spacing: 0.5px;
             transition: all 0.3s ease;
-            box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
         }
 
         button:hover {
-            opacity: 0.9;
-            box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+            opacity: 0.95;
+            box-shadow: 0 0 25px rgba(0, 240, 255, 0.5);
             transform: translateY(-1px);
         }
 
         pre {
-            background-color: #0b0f19;
-            border: 1px solid var(--border-color);
+            background-color: rgba(11, 15, 25, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             color: #38bdf8;
             padding: 15px;
             border-radius: 8px;
@@ -172,7 +173,7 @@ app.get('/', (req, res) => {
             text-decoration: none;
             font-weight: bold;
             font-size: 14px;
-            box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+            box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
             transition: 0.3s;
         }
 
@@ -258,7 +259,7 @@ app.get('/', (req, res) => {
                 if (dados.arquivoBase64) {
                     const link = document.getElementById('linkDownload');
                     link.href = \`data:\${dados.mimeType || 'application/octet-stream'};base64,\${dados.arquivoBase64}\`;
-                    link.download = dados.nomeArquivo || 'resultado.bin';
+                    link.download = dados.nomeArquivo || 'resultado_documento.bin';
                     containerDownload.style.display = 'block';
                 }
             } else {
@@ -342,7 +343,7 @@ app.get('/login', async (req, res) => {
 });
 
 // ==========================================
-// API DE CONSULTA (COM SUPORTE A ARQUIVOS)
+// API DE CONSULTA
 // ==========================================
 app.post('/api/consultar', async (req, res) => {
   const { tipo, termo } = req.body;
@@ -369,20 +370,17 @@ app.post('/api/consultar', async (req, res) => {
       let nomeArquivo = null;
       let mimeType = null;
 
-      // Se a mensagem do bot contiver um documento/arquivo anexado
       if (respostaBot.media) {
         try {
           const bufferArquivo = await telegramClient.downloadMedia(respostaBot.media, {});
           if (bufferArquivo) {
             arquivoBase64 = bufferArquivo.toString('base64');
-            
-            // Tentar extrair o nome original do arquivo dos atributos do documento
             const docAttr = respostaBot.media.document?.attributes?.find(attr => attr.className === 'DocumentAttributeFilename');
             nomeArquivo = docAttr ? docAttr.fileName : 'resultado_documento.bin';
             mimeType = respostaBot.media.document?.mimeType || 'application/octet-stream';
           }
         } catch (downloadErr) {
-          console.log('Erro ao baixar mídia do Telegram:', downloadErr.message);
+          console.log('Erro ao baixar mídia:', downloadErr.message);
         }
       }
 
