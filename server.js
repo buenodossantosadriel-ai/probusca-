@@ -36,6 +36,28 @@ function obterUtilizadores() {
   }
 }
 
+// ==========================================
+// SISTEMA DE FILA PARA EVITAR CONCORRÊNCIA
+// ==========================================
+let filaConsultas = Promise.resolve();
+
+function adicionarNaFila(tarefa) {
+  return new Promise((resolve, reject) => {
+    filaConsultas = filaConsultas
+      .then(async () => {
+        try {
+          const resultado = await tarefa();
+          // Intervalo de segurança de 3 segundos entre uma consulta e outra
+          await new Promise(r => setTimeout(r, 3000));
+          resolve(resultado);
+        } catch (err) {
+          reject(err);
+        }
+      })
+      .catch(reject);
+  });
+}
+
 let telegramClient = null;
 let loginSession = null;
 let telefoneTemp = null;
@@ -371,7 +393,7 @@ app.get('/', verificarAutenticacao, (req, res) => {
             return;
         }
 
-        resultadoBox.textContent = 'Processando consulta, aguarde...';
+        resultadoBox.textContent = 'Processando consulta na fila, aguarde...';
         containerDownload.style.display = 'none';
 
         try {
@@ -477,7 +499,7 @@ app.get('/login', verificarAutenticacao, async (req, res) => {
 });
 
 // ==========================================
-// API DE CONSULTA (PROTEGIDA)
+// API DE CONSULTA (PROTEGIDA E COM FILA)
 // ==========================================
 app.post('/api/consultar', verificarAutenticacao, async (req, res) => {
   const { tipo, termo } = req.body;
@@ -489,14 +511,19 @@ app.post('/api/consultar', verificarAutenticacao, async (req, res) => {
   const mensagemParaEnviar = `${comandoBase} ${termo.trim()}`;
 
   try {
-    if (telegramClient && telegramClient.connected && botUsername) {
+    // Executa a consulta de forma segura, enfileirada e sequencial
+    const respostaProcessada = await adicionarNaFila(async () => {
+      if (!telegramClient || !telegramClient.connected || !botUsername) {
+        throw new Error('Serviço temporariamente indisponível.');
+      }
+
       const msgEnviada = await telegramClient.sendMessage(botUsername, { message: mensagemParaEnviar });
       await new Promise((resolve) => setTimeout(resolve, 5000));
-      const mensagens = await telegramClient.getMessages(botUsername, { limit: 3 });
+      const mensagens = await telegramClient.getMessages(botUsername, { limit: 5 });
       const respostaBot = mensagens.find((m) => m.id > msgEnviada.id && !m.out);
 
       if (!respostaBot) {
-        return res.status(504).json({ erro: 'O serviço demorou para responder.' });
+        throw new Error('O serviço demorou para responder.');
       }
 
       let respostaTexto = respostaBot.message || '';
@@ -518,20 +545,24 @@ app.post('/api/consultar', verificarAutenticacao, async (req, res) => {
         }
       }
 
-      return res.json({ 
+      return { 
         sucesso: true, 
         comandoExecutado: tipo, 
         resultado: respostaTexto,
         arquivoBase64,
         nomeArquivo,
         mimeType
-      });
-    }
-    return res.status(503).json({ erro: 'Serviço temporariamente indisponível.' });
+      };
+    });
+
+    return res.json(respostaProcessada);
+
   } catch (error) {
-    console.error('Erro geral na consulta:', error);
-    res.status(500).json({ erro: 'Erro interno ao processar a consulta.' });
+    console.error('Erro na fila de consulta:', error.message);
+    const status = error.message.includes('indisponível') ? 503 : error.message.includes('demorou') ? 504 : 500;
+    res.status(status).json({ erro: error.message || 'Erro interno ao processar a consulta.' });
   }
 });
 
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+                                          
