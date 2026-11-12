@@ -1,14 +1,14 @@
 {
-  "name": "probusca",
+  "name": "probusca-backend",
   "version": "1.0.0",
-  "description": "API de busca B2B",
-  "main": "index.js",
+  "description": "Backend e automação do ProBusca SaaS",
+  "main": "server.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node server.js"
   },
   "dependencies": {
-    "axios": "^1.6.0",
+    "axios": "^1.7.7",
     "cors": "^2.8.5",
-    "express": "^4.18.2"
+    "express": "^4.21.1"
   }
 }
