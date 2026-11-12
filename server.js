@@ -1,68 +1,109 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+const { TelegramClient } = require('telegram');
+const { StringSession } = require('telegram/sessions');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Permite que o seu front-end na Vercel acesse este backend sem bloqueios (CORS)
 app.use(cors());
 app.use(express.json());
 
-// Rota de verificação de saúde (para confirmar que o servidor está online)
+// Configurações da sua conta Telegram (serão colocadas nas Variáveis de Ambiente da Render por segurança)
+const apiId = Number(process.env.TELEGRAM_API_ID);
+const apiHash = process.env.TELEGRAM_API_HASH;
+const stringSession = new StringSession(process.env.TELEGRAM_SESSION || '');
+const botUsername = process.env.TELEGRAM_BOT_USERNAME; // Ex: '@NomeDoBotDeBusca'
+
+let telegramClient = null;
+
+// Inicializa a conexão com o Telegram caso as credenciais estejam configuradas
+async function iniciarTelegram() {
+  if (apiId && apiHash && process.env.TELEGRAM_SESSION) {
+    telegramClient = new TelegramClient(stringSession, apiId, apiHash, {
+      connectionRetries: 5,
+    });
+    await telegramClient.connect();
+    console.log('✅ Sessão do Telegram conectada com sucesso nos bastidores!');
+  } else {
+    console.log('⚠️ Aguardando configuração das variáveis de sessão do Telegram na Render.');
+  }
+}
+iniciarTelegram();
+
+// Mapa exato dos comandos do seu Bot
+const MAPA_COMANDOS = {
+  nome: '/nome',
+  cpf: '/cpf3',
+  cnpj: '/cnpj',
+  telefone: '/telefone',
+  email: '/email',
+  placa: '/placa'
+};
+
+// Rota de status
 app.get('/', (req, res) => {
-  res.json({ 
-    status: 'online', 
+  res.json({
+    status: 'online',
     servico: 'ProBusca Backend API',
-    mensagem: 'Servidor rodando perfeitamente na Render!' 
+    telegramConectado: Boolean(telegramClient && telegramClient.connected)
   });
 });
 
-// 1. Rota de Consulta Direta de CNPJ (usando BrasilAPI como fonte estável)
-app.get('/api/cnpj/:cnpj', async (req, res) => {
-  const cnpjLimpo = req.params.cnpj.replace(/\D/g, '');
-  
-  if (cnpjLimpo.length !== 14) {
-    return res.status(400).json({ erro: 'CNPJ inválido. Digite 14 números.' });
+// Rota Principal de Consulta Invisível
+app.post('/api/consultar', async (req, res) => {
+  const { tipo, termo } = req.body; // Ex: tipo: 'cpf', termo: '12345678900'
+
+  if (!tipo || !termo) {
+    return res.status(400).json({ erro: 'Informe o tipo de busca e o termo a consultar.' });
   }
+
+  const comandoBase = MAPA_COMANDOS[tipo.toLowerCase()];
+  if (!comandoBase) {
+    return res.status(400).json({ erro: 'Tipo de consulta não suportado.' });
+  }
+
+  // Monta o comando exato: ex. "/cpf3 12345678900" ou "/placa ABC1D23"
+  const mensagemParaEnviar = `${comandoBase} ${termo.trim()}`;
 
   try {
-    const response = await axios.get(`https://brasilapi.com.br/api/cnpj/v1/${cnpjLimpo}`);
-    res.json(response.data);
-  } catch (error) {
-    res.status(404).json({ erro: 'CNPJ não encontrado ou indisponível no momento.' });
-  }
-});
+    // Se a sessão do Telegram já estiver ativa, faz a busca real
+    if (telegramClient && telegramClient.connected && botUsername) {
+      // 1. Envia o comando para o bot
+      const msgEnviada = await telegramClient.sendMessage(botUsername, {
+        message: mensagemParaEnviar,
+      });
 
-// 2. Rota Avançada de Ponte Invisível para o Telegram (CPF / Nome / Outros)
-app.post('/api/consulta-avancada', async (req, res) => {
-  const { documento, tipo } = req.body; 
+      // 2. Aguarda alguns segundos para o bot processar e responder
+      await new Promise((resolve) => setTimeout(resolve, 4000));
 
-  if (!documento) {
-    return res.status(400).json({ erro: 'Informe o documento ou termo para consulta.' });
-  }
+      // 3. Lê as últimas mensagens do chat com o bot para pegar a resposta
+      const mensagens = await telegramClient.getMessages(botUsername, { limit: 2 });
+      const respostaBot = mensagens.find((m) => m.id > msgEnviada.id && !m.out);
 
-  try {
-    // AQUI É ONDE O BOT DO TELEGRAM ENTRA EM AÇÃO NOS BASTIDORES:
-    // 1. O servidor Node.js envia o comando/documento para o chat do bot que você tem acesso.
-    // 2. Aguarda a resposta (texto ou dados retornados pelo bot).
-    // 3. Trata e limpa o texto recebido para transformar em um JSON limpo.
-
-    // Resposta estruturada de teste para conectar e validar com o seu Front-End
-    res.json({
-      sucesso: true,
-      mensagem: 'Consulta realizada com sucesso pelos bastidores',
-      dados: {
-        tipoConsulta: tipo || 'geral',
-        termoConsultado: documento,
-        resultadoBruto: 'Aqui virão os dados extraídos da resposta do bot do Telegram',
-        status: 'Processado de forma invisível'
+      if (!respostaBot || !respostaBot.message) {
+        return res.status(504).json({ erro: 'O servidor de dados demorou para responder. Tente novamente.' });
       }
+
+      return res.json({
+        sucesso: true,
+        comandoExecutado: tipo,
+        resultado: respostaBot.message
+      });
+    }
+
+    // Retorno de simulação enquanto você ainda não inseriu as chaves da sessão
+    return res.json({
+      sucesso: true,
+      modoSimulacao: true,
+      comandoPreparado: mensagemParaEnviar,
+      resultado: `Simulação concluída para [${mensagemParaEnviar}]. Conecte as chaves do Telegram na Render para receber os dados reais.`
     });
 
   } catch (error) {
-    console.error('Erro na automação do Telegram:', error);
-    res.status(500).json({ erro: 'Falha ao comunicar com o canal de consulta nos bastidores.' });
+    console.error('Erro na consulta:', error);
+    res.status(500).json({ erro: 'Erro interno ao processar a consulta.' });
   }
 });
 
