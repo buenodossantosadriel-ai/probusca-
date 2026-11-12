@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const cookieParser = require('cookie-parser'); // Importante para gerenciar a sessão de login
+const cookieParser = require('cookie-parser');
 const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 
@@ -16,9 +16,16 @@ const apiId = Number(process.env.TELEGRAM_API_ID);
 const apiHash = process.env.TELEGRAM_API_HASH;
 const botUsername = process.env.TELEGRAM_BOT_USERNAME;
 
-// Credenciais de acesso ao painel (você define nas variáveis da Render ou usa os padrões abaixo)
-const PAINEL_USER = process.env.PAINEL_USER || 'admin';
-const PAINEL_PASS = process.env.PAINEL_PASS || '123456';
+// ==========================================
+// LISTA DE UTILIZADORES AUTORIZADOS
+// ==========================================
+// Você pode adicionar quantos utilizadores quiser aqui no formato "utilizador": "senha"
+// Ou usar as variáveis de ambiente da Render caso prefira.
+const UTILIZADORES_AUTORIZADOS = {
+  [process.env.PAINEL_USER || 'admin']: process.env.PAINEL_PASS || '123456',
+  'adriel': 'senha123',
+  'convidado': 'busca2026'
+};
 
 let telegramClient = null;
 let loginSession = null;
@@ -134,14 +141,16 @@ app.get('/auth', (req, res) => {
 
 app.post('/auth', (req, res) => {
   const { usuario, senha } = req.body;
-  if (usuario === PAINEL_USER && senha === PAINEL_PASS) {
-    res.cookie('auth_token', 'logado_com_sucesso', { httpOnly: true, maxAge: 86400000 }); // Validade de 1 dia
+  
+  // Valida se o utilizador existe na lista e se a senha confere
+  if (UTILIZADORES_AUTORIZADOS[usuario] && UTILIZADORES_AUTORIZADOS[usuario] === senha) {
+    res.cookie('auth_token', 'logado_com_sucesso', { httpOnly: true, maxAge: 86400000 });
     return res.redirect('/');
   }
   res.redirect('/auth?erro=1');
 });
 
-// Middleware para verificar se está logado
+// Middleware de proteção
 function verificarAutenticacao(req, res, next) {
   if (req.cookies && req.cookies.auth_token === 'logado_com_sucesso') {
     return next();
@@ -387,7 +396,6 @@ app.get('/', verificarAutenticacao, (req, res) => {
   `);
 });
 
-// Rota para terminar a sessão
 app.get('/logout', (req, res) => {
   res.clearCookie('auth_token');
   res.redirect('/auth');
