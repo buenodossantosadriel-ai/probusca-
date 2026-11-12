@@ -5,11 +5,11 @@ const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Permite que o seu site hospedado na Vercel acesse este servidor sem bloqueios (CORS)
+// Permite que o seu front-end na Vercel acesse este backend sem bloqueios (CORS)
 app.use(cors());
 app.use(express.json());
 
-// Rota de verificação de saúde (para testar se o servidor está online na Render)
+// Rota de verificação de saúde (para confirmar que o servidor está online)
 app.get('/', (req, res) => {
   res.json({ 
     status: 'online', 
@@ -34,30 +34,35 @@ app.get('/api/cnpj/:cnpj', async (req, res) => {
   }
 });
 
-// 2. Rota de Ponte Invisível para o Telegram (CPF / Nome)
+// 2. Rota Avançada de Ponte Invisível para o Telegram (CPF / Nome / Outros)
 app.post('/api/consulta-avancada', async (req, res) => {
-  const { documento, tipo } = req.body; // Ex: documento: '12345678900', tipo: 'cpf'
+  const { documento, tipo } = req.body; 
 
   if (!documento) {
-    return res.status(400).json({ erro: 'Informe o CPF ou termo para consulta.' });
+    return res.status(400).json({ erro: 'Informe o documento ou termo para consulta.' });
   }
 
   try {
-    // AQUI ENTRARÁ A LÓGICA DO CLIENTE TELEGRAM (MTProto / GramJS)
-    // O servidor enviará o comando ao bot nos bastidores, lerá a resposta e devolverá aqui.
-    
-    // Simulação de resposta estruturada para validar a comunicação com seu Front-End:
+    // AQUI É ONDE O BOT DO TELEGRAM ENTRA EM AÇÃO NOS BASTIDORES:
+    // 1. O servidor Node.js envia o comando/documento para o chat do bot que você tem acesso.
+    // 2. Aguarda a resposta (texto ou dados retornados pelo bot).
+    // 3. Trata e limpa o texto recebido para transformar em um JSON limpo.
+
+    // Resposta estruturada de teste para conectar e validar com o seu Front-End
     res.json({
       sucesso: true,
-      origem: 'automacao-interna',
+      mensagem: 'Consulta realizada com sucesso pelos bastidores',
       dados: {
-        documento: documento,
-        nome: 'AGUARDANDO CONEXAO TELEGRAM',
-        status: 'Estrutura pronta para conectar sua sessão do Telegram'
+        tipoConsulta: tipo || 'geral',
+        termoConsultado: documento,
+        resultadoBruto: 'Aqui virão os dados extraídos da resposta do bot do Telegram',
+        status: 'Processado de forma invisível'
       }
     });
+
   } catch (error) {
-    res.status(500).json({ erro: 'Falha ao processar consulta nos bastidores.' });
+    console.error('Erro na automação do Telegram:', error);
+    res.status(500).json({ erro: 'Falha ao comunicar com o canal de consulta nos bastidores.' });
   }
 });
 
