@@ -15,17 +15,20 @@ const botUsername = process.env.TELEGRAM_BOT_USERNAME;
 
 let telegramClient = null;
 
-// Estados temporários do fluxo de login web
 let loginSession = null;
 let telefoneTemp = null;
 let resolveCodigo = null;
 let resolveSenha = null;
 
 async function iniciarTelegramConectado() {
-  if (apiId && apiHash && process.env.TELEGRAM_SESSION) {
-    telegramClient = new TelegramClient(new StringSession(process.env.TELEGRAM_SESSION), apiId, apiHash, { connectionRetries: 5 });
-    await telegramClient.connect();
-    console.log('✅ Sessão do Telegram conectada com sucesso!');
+  try {
+    if (apiId && apiHash && process.env.TELEGRAM_SESSION) {
+      telegramClient = new TelegramClient(new StringSession(process.env.TELEGRAM_SESSION), apiId, apiHash, { connectionRetries: 5 });
+      await telegramClient.connect();
+      console.log('✅ Sessão do Telegram conectada com sucesso!');
+    }
+  } catch (err) {
+    console.log('Erro ao conectar sessão salva:', err.message);
   }
 }
 iniciarTelegramConectado();
@@ -48,46 +51,47 @@ app.get('/', (req, res) => {
   });
 });
 
-// ==========================================
-// PAINEL WEB PASSO A PASSO NA RENDER (/login)
-// ==========================================
 app.get('/login', async (req, res) => {
   const { telefone, codigo, senha } = req.query;
 
-  // Passo 3: Recebeu o código
   if (codigo && resolveCodigo) {
     resolveCodigo(codigo);
     resolveCodigo = null;
-    return res.send(`<h2>Código recebido! A processar...</h2><p>Se tiver 2FA, atualize a página para inserir a senha. Caso contrário, olhe os logs da Render em 5 segundos para pegar a sua <code>TELEGRAM_SESSION</code>!</p>`);
+    return res.send(`<h2>Código recebido! A processar...</h2><p>Verifique os logs da Render em instantes para copiar a sua <code>TELEGRAM_SESSION</code>!</p>`);
   }
 
-  // Passo 4: Recebeu a senha 2FA (se houver)
   if (senha && resolveSenha) {
     resolveSenha(senha);
     resolveSenha = null;
-    return res.send(`<h2>Senha recebida! Finalizando...</h2><p>Olhe os logs da Render agora para copiar a sua <code>TELEGRAM_SESSION</code> gerada!</p>`);
+    return res.send(`<h2>Senha recebida! Finalizando...</h2><p>Verifique os logs da Render agora!</p>`);
   }
 
-  // Passo 1: Se informou o telefone, inicia o pedido de envio do Telegram
   if (telefone && !loginSession) {
     telefoneTemp = telefone.trim();
     loginSession = new StringSession('');
     
-    const tempClient = new TelegramClient(loginSession, apiId, apiHash, { connectionRetries: 5 });
-    
-    // Inicia o processo em segundo plano
-    tempClient.start({
-      phoneNumber: async () => telefoneTemp,
-      phoneCode: async () => new Promise((resolve) => { resolveCodigo = resolve; }),
-      password: async () => new Promise((resolve) => { resolveSenha = resolve; }),
-      onError: (err) => console.log('Erro no fluxo:', err.message),
-    }).then(() => {
-      const sessaoFinal = tempClient.session.save();
-      console.log('====================================================');
-      console.log('🎉 TELEGRAM_SESSION GERADA COM SUCESSO NA RENDER:');
-      console.log(sessaoFinal);
-      console.log('====================================================');
-    }).catch(e => console.log('Aviso de conclusão:', e.message));
+    try {
+      const tempClient = new TelegramClient(loginSession, apiId, apiHash, { connectionRetries: 3 });
+      
+      tempClient.start({
+        phoneNumber: async () => telefoneTemp,
+        phoneCode: async () => new Promise((resolve) => { resolveCodigo = resolve; }),
+        password: async () => new Promise((resolve) => { resolveSenha = resolve; }),
+        onError: (err) => console.log('Aviso do Telegram:', err.message),
+      }).then(() => {
+        const sessaoFinal = tempClient.session.save();
+        console.log('====================================================');
+        console.log('🎉 TELEGRAM_SESSION GERADA COM SUCESSO NA RENDER:');
+        console.log(sessaoFinal);
+        console.log('====================================================');
+      }).catch(e => {
+        console.log('Erro no processo start:', e.message);
+      });
+    } catch (e) {
+      console.log('Erro ao instanciar TelegramClient:', e.message);
+      loginSession = null;
+      return res.status(500).send(`<h2>Erro interno:</h2><p>${e.message}</p>`);
+    }
 
     return res.send(`
       <h2>2. Código solicitado ao Telegram!</h2>
@@ -100,15 +104,13 @@ app.get('/login', async (req, res) => {
     `);
   }
 
-  // Se já existe sessão salva na Render
   if (process.env.TELEGRAM_SESSION) {
     return res.send('<h2>✅ A sua TELEGRAM_SESSION já está configurada e ativa nas variáveis da Render!</h2>');
   }
 
-  // Passo 0: Tela inicial pedindo o telefone
   res.send(`
     <h2>Painel de Autenticação ProBusca - Telegram</h2>
-    <p>Insira o seu número de telemóvel com DDI e DDD para iniciar:</p>
+    <p>Insira o seu número de telemóvel com DDI e DDD:</p>
     <form action="/login" method="GET">
       <input type="text" name="telefone" value="+5549991017850" style="padding:12px; font-size:18px; width:280px;" required>
       <button type="submit" style="padding:12px 20px; font-size:18px; background:#007bff; color:#fff; border:none;">Solicitar Código</button>
@@ -116,7 +118,6 @@ app.get('/login', async (req, res) => {
   `);
 });
 
-// Rota de Consulta do SaaS
 app.post('/api/consultar', async (req, res) => {
   const { tipo, termo } = req.body;
   if (!tipo || !termo) return res.status(400).json({ erro: 'Informe o tipo e o termo.' });
