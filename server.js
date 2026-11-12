@@ -11,23 +11,24 @@ app.use(express.json());
 
 const apiId = Number(process.env.TELEGRAM_API_ID);
 const apiHash = process.env.TELEGRAM_API_HASH;
-const stringSession = new StringSession(process.env.TELEGRAM_SESSION || '');
 const botUsername = process.env.TELEGRAM_BOT_USERNAME;
-const meuTelefone = process.env.TELEGRAM_PHONE;
 
 let telegramClient = null;
-let clienteTemp = null;
-let resolverCodigo = null;
-let resolverSenha = null;
 
-async function iniciarTelegram() {
+// Estados temporários do fluxo de login web
+let loginSession = null;
+let telefoneTemp = null;
+let resolveCodigo = null;
+let resolveSenha = null;
+
+async function iniciarTelegramConectado() {
   if (apiId && apiHash && process.env.TELEGRAM_SESSION) {
-    telegramClient = new TelegramClient(stringSession, apiId, apiHash, { connectionRetries: 5 });
+    telegramClient = new TelegramClient(new StringSession(process.env.TELEGRAM_SESSION), apiId, apiHash, { connectionRetries: 5 });
     await telegramClient.connect();
     console.log('✅ Sessão do Telegram conectada com sucesso!');
   }
 }
-iniciarTelegram();
+iniciarTelegramConectado();
 
 const MAPA_COMANDOS = {
   nome: '/nome',
@@ -47,64 +48,75 @@ app.get('/', (req, res) => {
   });
 });
 
-// =========================================================================
-// PAINEL WEB DE LOGIN SIMPLES (Acesse no navegador do seu telemóvel)
-// =========================================================================
+// ==========================================
+// PAINEL WEB PASSO A PASSO NA RENDER (/login)
+// ==========================================
 app.get('/login', async (req, res) => {
-  const { codigo, senha } = req.query;
+  const { telefone, codigo, senha } = req.query;
 
-  if (codigo && resolverCodigo) {
-    resolverCodigo(codigo);
-    resolverCodigo = null;
-    return res.send('<h3>Código recebido! Finalizando conexão... Atualize esta página em 3 segundos.</h3>');
+  // Passo 3: Recebeu o código
+  if (codigo && resolveCodigo) {
+    resolveCodigo(codigo);
+    resolveCodigo = null;
+    return res.send(`<h2>Código recebido! A processar...</h2><p>Se tiver 2FA, atualize a página para inserir a senha. Caso contrário, olhe os logs da Render em 5 segundos para pegar a sua <code>TELEGRAM_SESSION</code>!</p>`);
   }
 
-  if (senha && resolverSenha) {
-    resolverSenha(senha);
-    resolverSenha = null;
-    return res.send('<h3>Senha 2FA recebida! Finalizando conexão... Atualize esta página em 3 segundos.</h3>');
+  // Passo 4: Recebeu a senha 2FA (se houver)
+  if (senha && resolveSenha) {
+    resolveSenha(senha);
+    resolveSenha = null;
+    return res.send(`<h2>Senha recebida! Finalizando...</h2><p>Olhe os logs da Render agora para copiar a sua <code>TELEGRAM_SESSION</code> gerada!</p>`);
   }
 
-  if (!process.env.TELEGRAM_SESSION && !clienteTemp && meuTelefone) {
-    try {
-      clienteTemp = new TelegramClient(new StringSession(''), apiId, apiHash, { connectionRetries: 5 });
-      clienteTemp.start({
-        phoneNumber: async () => meuTelefone,
-        phoneCode: async () => new Promise((resolve) => { resolverCodigo = resolve; }),
-        password: async () => new Promise((resolve) => { resolverSenha = resolve; }),
-        onError: (err) => console.log('Erro:', err.message),
-      }).then(() => {
-        const sessaoGerada = clienteTemp.session.save();
-        console.log('=== TELEGRAM_SESSION GERADA COM SUCESSO ===');
-        console.log(sessaoGerada);
-      });
-    } catch (e) {
-      console.log('Erro ao iniciar:', e);
-    }
+  // Passo 1: Se informou o telefone, inicia o pedido de envio do Telegram
+  if (telefone && !loginSession) {
+    telefoneTemp = telefone.trim();
+    loginSession = new StringSession('');
+    
+    const tempClient = new TelegramClient(loginSession, apiId, apiHash, { connectionRetries: 5 });
+    
+    // Inicia o processo em segundo plano
+    tempClient.start({
+      phoneNumber: async () => telefoneTemp,
+      phoneCode: async () => new Promise((resolve) => { resolveCodigo = resolve; }),
+      password: async () => new Promise((resolve) => { resolveSenha = resolve; }),
+      onError: (err) => console.log('Erro no fluxo:', err.message),
+    }).then(() => {
+      const sessaoFinal = tempClient.session.save();
+      console.log('====================================================');
+      console.log('🎉 TELEGRAM_SESSION GERADA COM SUCESSO NA RENDER:');
+      console.log(sessaoFinal);
+      console.log('====================================================');
+    }).catch(e => console.log('Aviso de conclusão:', e.message));
+
+    return res.send(`
+      <h2>2. Código solicitado ao Telegram!</h2>
+      <p>O Telegram enviou um código de confirmação para o aplicativo do número <b>${telefoneTemp}</b>.</p>
+      <form action="/login" method="GET">
+        <label><b>Digite o código recebido:</b></label><br><br>
+        <input type="text" name="codigo" placeholder="Ex: 12345" style="padding:12px; font-size:18px;" required>
+        <button type="submit" style="padding:12px 20px; font-size:18px; background:#28a745; color:#fff; border:none;">Enviar Código</button>
+      </form>
+    `);
   }
 
+  // Se já existe sessão salva na Render
   if (process.env.TELEGRAM_SESSION) {
-    return res.send('<h2>✅ A sua TELEGRAM_SESSION já está configurada e ativa na Render!</h2>');
+    return res.send('<h2>✅ A sua TELEGRAM_SESSION já está configurada e ativa nas variáveis da Render!</h2>');
   }
 
+  // Passo 0: Tela inicial pedindo o telefone
   res.send(`
-    <h2>Painel de Autenticação Telegram - ProBusca</h2>
-    <p>1. Se acabou de abrir, o Telegram já enviou o código para o seu telemóvel.</p>
+    <h2>Painel de Autenticação ProBusca - Telegram</h2>
+    <p>Insira o seu número de telemóvel com DDI e DDD para iniciar:</p>
     <form action="/login" method="GET">
-      <label>Insira o código do Telegram:</label><br><br>
-      <input type="text" name="codigo" placeholder="Ex: 12345" style="padding:10px; font-size:16px;" required>
-      <button type="submit" style="padding:10px 20px; font-size:16px;">Enviar Código</button>
-    </form>
-    <br><hr><br>
-    <p>Caso utilize verificação em duas etapas (Senha):</p>
-    <form action="/login" method="GET">
-      <input type="text" name="senha" placeholder="Sua senha 2FA" style="padding:10px; font-size:16px;">
-      <button type="submit" style="padding:10px 20px; font-size:16px;">Enviar Senha</button>
+      <input type="text" name="telefone" value="+5549991017850" style="padding:12px; font-size:18px; width:280px;" required>
+      <button type="submit" style="padding:12px 20px; font-size:18px; background:#007bff; color:#fff; border:none;">Solicitar Código</button>
     </form>
   `);
 });
 
-// Rota de Consulta
+// Rota de Consulta do SaaS
 app.post('/api/consultar', async (req, res) => {
   const { tipo, termo } = req.body;
   if (!tipo || !termo) return res.status(400).json({ erro: 'Informe o tipo e o termo.' });
