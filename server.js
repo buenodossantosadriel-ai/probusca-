@@ -25,6 +25,7 @@ const UTILIZADORES_AUTORIZADOS = {
   [process.env.PAINEL_USER || 'admin']: process.env.PAINEL_PASS || '123456',
   'adriel': 'senha123',
   'convidado': 'busca2026'
+  'Ricardo': '141812'
 };
 
 let telegramClient = null;
