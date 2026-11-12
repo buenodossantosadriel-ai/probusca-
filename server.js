@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser'); // Importante para gerenciar a sessão de login
 const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 
@@ -8,10 +9,16 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 const apiId = Number(process.env.TELEGRAM_API_ID);
 const apiHash = process.env.TELEGRAM_API_HASH;
 const botUsername = process.env.TELEGRAM_BOT_USERNAME;
+
+// Credenciais de acesso ao painel (você define nas variáveis da Render ou usa os padrões abaixo)
+const PAINEL_USER = process.env.PAINEL_USER || 'admin';
+const PAINEL_PASS = process.env.PAINEL_PASS || '123456';
 
 let telegramClient = null;
 let loginSession = null;
@@ -42,9 +49,110 @@ const MAPA_COMANDOS = {
 };
 
 // ==========================================
-// ROTA PRINCIPAL: FRONT-END COM A SUA FOTO
+// ROTA DE LOGIN DO PAINEL (/auth)
 // ==========================================
-app.get('/', (req, res) => {
+app.get('/auth', (req, res) => {
+  res.send(`
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProBusca - Login</title>
+    <style>
+        :root {
+            --neon-cyan: #00f0ff;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+        }
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(rgba(11, 15, 25, 0.85), rgba(11, 15, 25, 0.92)), 
+                        url('https://i.ibb.co/8D7J6LY4/images-2.jpg') no-repeat center center fixed;
+            background-size: cover;
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 90vh;
+        }
+        .card {
+            background-color: rgba(19, 27, 46, 0.85);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(0, 240, 255, 0.25);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 0 35px rgba(0, 240, 255, 0.2);
+            width: 100%;
+            max-width: 400px;
+            box-sizing: border-box;
+        }
+        h2 {
+            margin-top: 0;
+            text-align: center;
+            color: var(--neon-cyan);
+            letter-spacing: 2px;
+            text-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+        }
+        label { display: block; margin-top: 15px; color: var(--text-muted); font-size: 14px; }
+        input {
+            width: 100%; padding: 14px; margin-top: 6px;
+            background-color: rgba(11, 15, 25, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px; color: var(--text-main); box-sizing: border-box; font-size: 15px;
+        }
+        input:focus { outline: none; border-color: var(--neon-cyan); box-shadow: 0 0 10px rgba(0, 240, 255, 0.3); }
+        button {
+            width: 100%; padding: 14px; margin-top: 25px;
+            background: linear-gradient(135deg, var(--neon-cyan), #0077ff);
+            color: #0b0f19; border: none; border-radius: 8px;
+            cursor: pointer; font-weight: 700; font-size: 16px;
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.3); transition: 0.3s;
+        }
+        button:hover { opacity: 0.95; box-shadow: 0 0 25px rgba(0, 240, 255, 0.5); }
+        .erro { color: #f87171; text-align: center; margin-top: 15px; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h2>AUTENTICAÇÃO</h2>
+    <form action="/auth" method="POST">
+        <label>Utilizador:</label>
+        <input type="text" name="usuario" required autocomplete="off">
+        <label>Senha:</label>
+        <input type="password" name="senha" required>
+        <button type="submit">ENTRAR NO PAINEL</button>
+    </form>
+    ${req.query.erro ? '<div class="erro">Utilizador ou senha incorretos!</div>' : ''}
+</div>
+</body>
+</html>
+  `);
+});
+
+app.post('/auth', (req, res) => {
+  const { usuario, senha } = req.body;
+  if (usuario === PAINEL_USER && senha === PAINEL_PASS) {
+    res.cookie('auth_token', 'logado_com_sucesso', { httpOnly: true, maxAge: 86400000 }); // Validade de 1 dia
+    return res.redirect('/');
+  }
+  res.redirect('/auth?erro=1');
+});
+
+// Middleware para verificar se está logado
+function verificarAutenticacao(req, res, next) {
+  if (req.cookies && req.cookies.auth_token === 'logado_com_sucesso') {
+    return next();
+  }
+  res.redirect('/auth');
+}
+
+// ==========================================
+// ROTA PRINCIPAL: FRONT-END (PROTEGIDO)
+// ==========================================
+app.get('/', verificarAutenticacao, (req, res) => {
   res.send(`
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -191,6 +299,7 @@ app.get('/', (req, res) => {
             color: var(--text-muted);
             text-decoration: none;
             transition: color 0.2s;
+            margin: 0 10px;
         }
 
         .links a:hover {
@@ -227,6 +336,7 @@ app.get('/', (req, res) => {
 
     <div class="links">
         <a href="/login" target="_blank">Gerir Conexão</a>
+        <a href="/logout">Sair</a>
     </div>
 </div>
 
@@ -277,10 +387,16 @@ app.get('/', (req, res) => {
   `);
 });
 
+// Rota para terminar a sessão
+app.get('/logout', (req, res) => {
+  res.clearCookie('auth_token');
+  res.redirect('/auth');
+});
+
 // ==========================================
-// PAINEL DE AUTENTICAÇÃO (/login)
+// PAINEL DE AUTENTICAÇÃO DO TELEGRAM (/login)
 // ==========================================
-app.get('/login', async (req, res) => {
+app.get('/login', verificarAutenticacao, async (req, res) => {
   const { telefone, codigo, senha } = req.query;
 
   if (codigo && resolveCodigo) {
@@ -343,9 +459,9 @@ app.get('/login', async (req, res) => {
 });
 
 // ==========================================
-// API DE CONSULTA
+// API DE CONSULTA (PROTEGIDA)
 // ==========================================
-app.post('/api/consultar', async (req, res) => {
+app.post('/api/consultar', verificarAutenticacao, async (req, res) => {
   const { tipo, termo } = req.body;
   if (!tipo || !termo) return res.status(400).json({ erro: 'Informe o tipo e o termo.' });
 
