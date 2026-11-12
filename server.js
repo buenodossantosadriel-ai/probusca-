@@ -24,7 +24,7 @@ async function iniciarTelegramConectado() {
     if (apiId && apiHash && process.env.TELEGRAM_SESSION) {
       telegramClient = new TelegramClient(new StringSession(process.env.TELEGRAM_SESSION), apiId, apiHash, { connectionRetries: 5 });
       await telegramClient.connect();
-      console.log('✅ Sessão do Telegram conectada com sucesso!');
+      console.log('✅ Sessão conectada com sucesso!');
     }
   } catch (err) {
     console.log('Erro ao conectar sessão salva:', err.message);
@@ -42,7 +42,7 @@ const MAPA_COMANDOS = {
 };
 
 // ==========================================
-// ROTA PRINCIPAL: FRONT-END VISUAL DA APLICAÇÃO
+// ROTA PRINCIPAL: FRONT-END NEON MODERNO
 // ==========================================
 app.get('/', (req, res) => {
   res.send(`
@@ -51,26 +51,138 @@ app.get('/', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ProBusca - Consulta Telegram</title>
+    <title>ProBusca - Painel de Consultas</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 90vh; }
-        .card { background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 450px; }
-        h2 { margin-top: 0; color: #333; text-align: center; }
-        label { display: block; margin-top: 15px; font-weight: bold; color: #555; }
-        select, input, button { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
-        button { background: #007bff; color: white; border: none; margin-top: 20px; cursor: pointer; font-weight: bold; }
-        button:hover { background: #0056b3; }
-        pre { background: #e9ecef; padding: 12px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; max-height: 300px; overflow-y: auto; font-size: 14px; margin-top: 20px; }
-        .links { margin-top: 15px; text-align: center; font-size: 14px; }
-        .links a { color: #007bff; text-decoration: none; }
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: #131b2e;
+            --neon-cyan: #00f0ff;
+            --neon-purple: #9d00ff;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border-color: #1e293b;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 90vh;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 0 25px rgba(0, 240, 255, 0.08);
+            width: 100%;
+            max-width: 480px;
+            box-sizing: border-box;
+        }
+
+        h2 {
+            margin-top: 0;
+            text-align: center;
+            color: var(--neon-cyan);
+            letter-spacing: 1px;
+            font-weight: 600;
+            text-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+        }
+
+        label {
+            display: block;
+            margin-top: 18px;
+            font-weight: 500;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 14px;
+            margin-top: 6px;
+            background-color: #0b0f19;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-main);
+            box-sizing: border-box;
+            font-size: 15px;
+            transition: all 0.3s ease;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 8px rgba(0, 240, 255, 0.25);
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            margin-top: 25px;
+            background: linear-gradient(135deg, var(--neon-cyan), #0077ff);
+            color: #0b0f19;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 16px;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+        }
+
+        button:hover {
+            opacity: 0.9;
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+            transform: translateY(-1px);
+        }
+
+        pre {
+            background-color: #0b0f19;
+            border: 1px solid var(--border-color);
+            color: #38bdf8;
+            padding: 15px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 320px;
+            overflow-y: auto;
+            font-size: 13px;
+            margin-top: 25px;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        .links {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 13px;
+        }
+
+        .links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .links a:hover {
+            color: var(--neon-cyan);
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>ProBusca Consulta</h2>
+    <h2>PROBUSCA</h2>
     
-    <label for="tipo">Tipo de Consulta:</label>
+    <label for="tipo">Tipo de Consulta</label>
     <select id="tipo">
         <option value="telefone">Telefone</option>
         <option value="nome">Nome</option>
@@ -80,15 +192,15 @@ app.get('/', (req, res) => {
         <option value="placa">Placa</option>
     </select>
 
-    <label for="termo">Termo a pesquisar:</label>
+    <label for="termo">Termo a Pesquisar</label>
     <input type="text" id="termo" value="49991017850" placeholder="Digite o valor...">
 
-    <button onclick="realizarConsulta()">Consultar</button>
+    <button onclick="realizarConsulta()">EXECUTAR CONSULTA</button>
 
-    <pre id="resultado">Aguardando consulta...</pre>
+    <pre id="resultado">Aguardando comando...</pre>
 
     <div class="links">
-        <a href="/login" target="_blank">Gerir / Reautenticar Sessão Telegram</a>
+        <a href="/login" target="_blank">Gerir Conexão</a>
     </div>
 </div>
 
@@ -103,7 +215,7 @@ app.get('/', (req, res) => {
             return;
         }
 
-        resultadoBox.textContent = 'A consultar, aguarde alguns segundos...';
+        resultadoBox.textContent = 'Processando consulta, aguarde...';
 
         try {
             const resposta = await fetch('/api/consultar', {
@@ -132,7 +244,7 @@ app.get('/', (req, res) => {
 });
 
 // ==========================================
-// PAINEL WEB DE LOGIN DO TELEGRAM (/login)
+// PAINEL DE AUTENTICAÇÃO (/login)
 // ==========================================
 app.get('/login', async (req, res) => {
   const { telefone, codigo, senha } = req.query;
@@ -140,7 +252,7 @@ app.get('/login', async (req, res) => {
   if (codigo && resolveCodigo) {
     resolveCodigo(codigo);
     resolveCodigo = null;
-    return res.send(`<h2>Código recebido! A processar...</h2><p>Verifique os logs da Render em instantes para copiar a sua <code>TELEGRAM_SESSION</code>!</p>`);
+    return res.send(`<h2>Código recebido! A processar...</h2><p>Verifique os logs da Render em instantes para copiar a sua chave de sessão.</p>`);
   }
 
   if (senha && resolveSenha) {
@@ -160,11 +272,11 @@ app.get('/login', async (req, res) => {
         phoneNumber: async () => telefoneTemp,
         phoneCode: async () => new Promise((resolve) => { resolveCodigo = resolve; }),
         password: async () => new Promise((resolve) => { resolveSenha = resolve; }),
-        onError: (err) => console.log('Aviso do Telegram:', err.message),
+        onError: (err) => console.log('Aviso:', err.message),
       }).then(() => {
         const sessaoFinal = tempClient.session.save();
         console.log('====================================================');
-        console.log('🎉 TELEGRAM_SESSION GERADA COM SUCESSO NA RENDER:');
+        console.log('🎉 CHAVE DE SESSÃO GERADA COM SUCESSO:');
         console.log(sessaoFinal);
         console.log('====================================================');
       }).catch(e => {
@@ -177,22 +289,21 @@ app.get('/login', async (req, res) => {
     }
 
     return res.send(`
-      <h2>2. Código solicitado ao Telegram!</h2>
-      <p>O Telegram enviou um código de confirmação para o aplicativo do número <b>${telefoneTemp}</b>.</p>
+      <h2>Confirmação de Acesso</h2>
+      <p>Insira o código enviado para o aplicativo do número <b>${telefoneTemp}</b>.</p>
       <form action="/login" method="GET">
-        <label><b>Digite o código recebido:</b></label><br><br>
         <input type="text" name="codigo" placeholder="Ex: 12345" style="padding:12px; font-size:18px;" required>
-        <button type="submit" style="padding:12px 20px; font-size:18px; background:#28a745; color:#fff; border:none;">Enviar Código</button>
+        <button type="submit" style="padding:12px 20px; font-size:18px; background:#00f0ff; color:#0b0f19; border:none; font-weight:bold;">Enviar Código</button>
       </form>
     `);
   }
 
   res.send(`
-    <h2>Painel de Autenticação ProBusca - Telegram</h2>
-    <p>Insira o seu número de telemóvel com DDI e DDD:</p>
+    <h2>Painel de Autenticação</h2>
+    <p>Insira o número de telemóvel com DDI e DDD:</p>
     <form action="/login" method="GET">
       <input type="text" name="telefone" value="+5549991017850" style="padding:12px; font-size:18px; width:280px;" required>
-      <button type="submit" style="padding:12px 20px; font-size:18px; background:#007bff; color:#fff; border:none;">Solicitar Código</button>
+      <button type="submit" style="padding:12px 20px; font-size:18px; background:#00f0ff; color:#0b0f19; border:none; font-weight:bold;">Solicitar Código</button>
     </form>
   `);
 });
@@ -217,11 +328,11 @@ app.post('/api/consultar', async (req, res) => {
       const respostaBot = mensagens.find((m) => m.id > msgEnviada.id && !m.out);
 
       if (!respostaBot || !respostaBot.message) {
-        return res.status(504).json({ erro: 'O bot demorou para responder.' });
+        return res.status(504).json({ erro: 'O serviço demorou para responder.' });
       }
       return res.json({ sucesso: true, comandoExecutado: tipo, resultado: respostaBot.message });
     }
-    return res.status(503).json({ erro: 'Sessão do Telegram não conectada.' });
+    return res.status(503).json({ erro: 'Serviço temporariamente indisponível.' });
   } catch (error) {
     res.status(500).json({ erro: 'Erro interno ao processar a consulta.' });
   }
