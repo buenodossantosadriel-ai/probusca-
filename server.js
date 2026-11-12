@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const fs = require('fs');
+const path = require('path');
 const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 
@@ -17,16 +19,22 @@ const apiHash = process.env.TELEGRAM_API_HASH;
 const botUsername = process.env.TELEGRAM_BOT_USERNAME;
 
 // ==========================================
-// LISTA DE UTILIZADORES AUTORIZADOS
+// FUNÇÃO PARA LER O FICHEIRO EXTERNO DE UTILIZADORES
 // ==========================================
-// Você pode adicionar quantos utilizadores quiser aqui no formato "utilizador": "senha"
-// Ou usar as variáveis de ambiente da Render caso prefira.
-const UTILIZADORES_AUTORIZADOS = {
-  [process.env.PAINEL_USER || 'admin']: process.env.PAINEL_PASS || '123456',
-  'adriel': 'senha123',
-  'convidado': 'busca2026',
-  'Ricardo': '141812'
-};
+function obterUtilizadores() {
+  try {
+    const caminhoFicheiro = path.join(__dirname, 'usuarios.json');
+    if (!fs.existsSync(caminhoFicheiro)) {
+      console.log('⚠️ Ficheiro usuarios.json não encontrado. A usar predefinição.');
+      return { [process.env.PAINEL_USER || 'admin']: process.env.PAINEL_PASS || '123456' };
+    }
+    const dadosBrutos = fs.readFileSync(caminhoFicheiro, 'utf8');
+    return JSON.parse(dadosBrutos);
+  } catch (err) {
+    console.log('Erro ao ler o ficheiro de utilizadores:', err.message);
+    return {};
+  }
+}
 
 let telegramClient = null;
 let loginSession = null;
@@ -143,7 +151,9 @@ app.get('/auth', (req, res) => {
 app.post('/auth', (req, res) => {
   const { usuario, senha } = req.body;
   
-  // Valida se o utilizador existe na lista e se a senha confere
+  // Lê os utilizadores em tempo real do ficheiro externo
+  const UTILIZADORES_AUTORIZADOS = obterUtilizadores();
+  
   if (UTILIZADORES_AUTORIZADOS[usuario] && UTILIZADORES_AUTORIZADOS[usuario] === senha) {
     res.cookie('auth_token', 'logado_com_sucesso', { httpOnly: true, maxAge: 86400000 });
     return res.redirect('/');
@@ -151,7 +161,6 @@ app.post('/auth', (req, res) => {
   res.redirect('/auth?erro=1');
 });
 
-// Middleware de proteção
 function verificarAutenticacao(req, res, next) {
   if (req.cookies && req.cookies.auth_token === 'logado_com_sucesso') {
     return next();
