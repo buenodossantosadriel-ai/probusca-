@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const axios = require('axios');
 const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 
@@ -10,29 +9,47 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Configurações da sua conta Telegram (serão colocadas nas Variáveis de Ambiente da Render por segurança)
 const apiId = Number(process.env.TELEGRAM_API_ID);
 const apiHash = process.env.TELEGRAM_API_HASH;
 const stringSession = new StringSession(process.env.TELEGRAM_SESSION || '');
-const botUsername = process.env.TELEGRAM_BOT_USERNAME; // Ex: '@NomeDoBotDeBusca'
+const botUsername = process.env.TELEGRAM_BOT_USERNAME;
+const meuTelefone = process.env.TELEGRAM_PHONE; // Número salvo na Render
 
 let telegramClient = null;
 
-// Inicializa a conexão com o Telegram caso as credenciais estejam configuradas
 async function iniciarTelegram() {
-  if (apiId && apiHash && process.env.TELEGRAM_SESSION) {
+  if (apiId && apiHash) {
     telegramClient = new TelegramClient(stringSession, apiId, apiHash, {
       connectionRetries: 5,
     });
-    await telegramClient.connect();
-    console.log('✅ Sessão do Telegram conectada com sucesso nos bastidores!');
-  } else {
-    console.log('⚠️ Aguardando configuração das variáveis de sessão do Telegram na Render.');
+
+    if (!process.env.TELEGRAM_SESSION && meuTelefone) {
+      console.log('🔄 Nenhuma sessão encontrada. Iniciando autenticação automática para:', meuTelefone);
+      try {
+        await telegramClient.start({
+          phoneNumber: async () => meuTelefone,
+          phoneCode: async () => {
+            console.log('====================================================');
+            console.log('📱 CÓDIGO DE LOGIN SOLICITADO AO TELEGRAM!');
+            console.log('Por favor, olhe os logs da Render para ver o código ou digite no Telegram.');
+            console.log('====================================================');
+            // Como estamos sem interatividade via terminal web direto, 
+            // vamos usar um método alternativo simples abaixo se precisar.
+            return ''; 
+          },
+          onError: (err) => console.error('Erro no login:', err),
+        });
+      } catch (e) {
+        console.log('Aviso de login:', e.message);
+      }
+    } else {
+      await telegramClient.connect();
+      console.log('✅ Sessão do Telegram conectada com sucesso!');
+    }
   }
 }
 iniciarTelegram();
 
-// Mapa exato dos comandos do seu Bot
 const MAPA_COMANDOS = {
   nome: '/nome',
   cpf: '/cpf3',
@@ -42,18 +59,18 @@ const MAPA_COMANDOS = {
   placa: '/placa'
 };
 
-// Rota de status
 app.get('/', (req, res) => {
   res.json({
     status: 'online',
     servico: 'ProBusca Backend API',
-    telegramConectado: Boolean(telegramClient && telegramClient.connected)
+    telegramConectado: Boolean(telegramClient && telegramClient.connected),
+    sessaoSalva: Boolean(process.env.TELEGRAM_SESSION)
   });
 });
 
-// Rota Principal de Consulta Invisível
+// Rota de Consulta do SaaS
 app.post('/api/consultar', async (req, res) => {
-  const { tipo, termo } = req.body; // Ex: tipo: 'cpf', termo: '12345678900'
+  const { tipo, termo } = req.body;
 
   if (!tipo || !termo) {
     return res.status(400).json({ erro: 'Informe o tipo de busca e o termo a consultar.' });
@@ -64,26 +81,21 @@ app.post('/api/consultar', async (req, res) => {
     return res.status(400).json({ erro: 'Tipo de consulta não suportado.' });
   }
 
-  // Monta o comando exato: ex. "/cpf3 12345678900" ou "/placa ABC1D23"
   const mensagemParaEnviar = `${comandoBase} ${termo.trim()}`;
 
   try {
-    // Se a sessão do Telegram já estiver ativa, faz a busca real
     if (telegramClient && telegramClient.connected && botUsername) {
-      // 1. Envia o comando para o bot
       const msgEnviada = await telegramClient.sendMessage(botUsername, {
         message: mensagemParaEnviar,
       });
 
-      // 2. Aguarda alguns segundos para o bot processar e responder
-      await new Promise((resolve) => setTimeout(resolve, 4000));
+      await new Promise((resolve) => setTimeout(resolve, 4500));
 
-      // 3. Lê as últimas mensagens do chat com o bot para pegar a resposta
-      const mensagens = await telegramClient.getMessages(botUsername, { limit: 2 });
+      const mensagens = await telegramClient.getMessages(botUsername, { limit: 3 });
       const respostaBot = mensagens.find((m) => m.id > msgEnviada.id && !m.out);
 
       if (!respostaBot || !respostaBot.message) {
-        return res.status(504).json({ erro: 'O servidor de dados demorou para responder. Tente novamente.' });
+        return res.status(504).json({ erro: 'O bot demorou para responder. Tente novamente.' });
       }
 
       return res.json({
@@ -93,14 +105,7 @@ app.post('/api/consultar', async (req, res) => {
       });
     }
 
-    // Retorno de simulação enquanto você ainda não inseriu as chaves da sessão
-    return res.json({
-      sucesso: true,
-      modoSimulacao: true,
-      comandoPreparado: mensagemParaEnviar,
-      resultado: `Simulação concluída para [${mensagemParaEnviar}]. Conecte as chaves do Telegram na Render para receber os dados reais.`
-    });
-
+    return res.status(503).json({ erro: 'Sessão do Telegram não conectada.' });
   } catch (error) {
     console.error('Erro na consulta:', error);
     res.status(500).json({ erro: 'Erro interno ao processar a consulta.' });
