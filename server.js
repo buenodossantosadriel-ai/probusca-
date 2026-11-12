@@ -14,7 +14,6 @@ const apiHash = process.env.TELEGRAM_API_HASH;
 const botUsername = process.env.TELEGRAM_BOT_USERNAME;
 
 let telegramClient = null;
-
 let loginSession = null;
 let telefoneTemp = null;
 let resolveCodigo = null;
@@ -42,15 +41,99 @@ const MAPA_COMANDOS = {
   placa: '/placa'
 };
 
+// ==========================================
+// ROTA PRINCIPAL: FRONT-END VISUAL DA APLICAÇÃO
+// ==========================================
 app.get('/', (req, res) => {
-  res.json({
-    status: 'online',
-    servico: 'ProBusca Backend API',
-    telegramConectado: Boolean(telegramClient && telegramClient.connected),
-    sessaoSalva: Boolean(process.env.TELEGRAM_SESSION)
-  });
+  res.send(`
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProBusca - Consulta Telegram</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 90vh; }
+        .card { background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 450px; }
+        h2 { margin-top: 0; color: #333; text-align: center; }
+        label { display: block; margin-top: 15px; font-weight: bold; color: #555; }
+        select, input, button { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
+        button { background: #007bff; color: white; border: none; margin-top: 20px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        pre { background: #e9ecef; padding: 12px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; max-height: 300px; overflow-y: auto; font-size: 14px; margin-top: 20px; }
+        .links { margin-top: 15px; text-align: center; font-size: 14px; }
+        .links a { color: #007bff; text-decoration: none; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>ProBusca Consulta</h2>
+    
+    <label for="tipo">Tipo de Consulta:</label>
+    <select id="tipo">
+        <option value="telefone">Telefone</option>
+        <option value="nome">Nome</option>
+        <option value="cpf">CPF</option>
+        <option value="cnpj">CNPJ</option>
+        <option value="email">E-mail</option>
+        <option value="placa">Placa</option>
+    </select>
+
+    <label for="termo">Termo a pesquisar:</label>
+    <input type="text" id="termo" value="49991017850" placeholder="Digite o valor...">
+
+    <button onclick="realizarConsulta()">Consultar</button>
+
+    <pre id="resultado">Aguardando consulta...</pre>
+
+    <div class="links">
+        <a href="/login" target="_blank">Gerir / Reautenticar Sessão Telegram</a>
+    </div>
+</div>
+
+<script>
+    async function realizarConsulta() {
+        const tipo = document.getElementById('tipo').value;
+        const termo = document.getElementById('termo').value;
+        const resultadoBox = document.getElementById('resultado');
+
+        if (!termo) {
+            alert('Por favor, preencha o termo de busca.');
+            return;
+        }
+
+        resultadoBox.textContent = 'A consultar, aguarde alguns segundos...';
+
+        try {
+            const resposta = await fetch('/api/consultar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tipo, termo })
+            });
+
+            const dados = await resposta.json();
+
+            if (resposta.ok) {
+                resultadoBox.textContent = dados.resultado;
+            } else {
+                resultadoBox.textContent = 'Erro: ' + (dados.erro || 'Falha na consulta');
+            }
+        } catch (error) {
+            resultadoBox.textContent = 'Erro de conexão com o servidor.';
+            console.error(error);
+        }
+    }
+</script>
+
+</body>
+</html>
+  `);
 });
 
+// ==========================================
+// PAINEL WEB DE LOGIN DO TELEGRAM (/login)
+// ==========================================
 app.get('/login', async (req, res) => {
   const { telefone, codigo, senha } = req.query;
 
@@ -104,10 +187,6 @@ app.get('/login', async (req, res) => {
     `);
   }
 
-  if (process.env.TELEGRAM_SESSION) {
-    return res.send('<h2>✅ A sua TELEGRAM_SESSION já está configurada e ativa nas variáveis da Render!</h2>');
-  }
-
   res.send(`
     <h2>Painel de Autenticação ProBusca - Telegram</h2>
     <p>Insira o seu número de telemóvel com DDI e DDD:</p>
@@ -118,6 +197,9 @@ app.get('/login', async (req, res) => {
   `);
 });
 
+// ==========================================
+// API DE CONSULTA
+// ==========================================
 app.post('/api/consultar', async (req, res) => {
   const { tipo, termo } = req.body;
   if (!tipo || !termo) return res.status(400).json({ erro: 'Informe o tipo e o termo.' });
